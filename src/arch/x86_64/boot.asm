@@ -8,6 +8,15 @@ start:
   mov dword [0xb8000], 0x2f4b2f4f
   hlt
 
+check_multiboot:
+  cmp eax, 0x36d76289
+  jne .no_multiboot
+  ret
+
+.no_multiboot:
+  mov al, "0"
+  jmp error
+
 error:
   mov dword [0xb8000], 0x4f524f45
   mov dword [0xb8004], 0x4f3a4f52
