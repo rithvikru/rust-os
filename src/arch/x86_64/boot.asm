@@ -82,6 +82,31 @@ check_long_mode:
   mov al, "2"
   jmp error
 
+set_up_page_tables:
+  mov eax, p3_table       ; move p3 table to A register
+  or eax, 0b11            ; present, writable
+  mov [p4_table], eax     ; map p4 table to p3 table
+
+  mov eax, p2_table       ; move p2 table to A register
+  or eax, 0b11            ; present, writable
+  mov [p3_table], eax     ; map p3 table to p2 table
+
+  mov ecx, 0              ; counter var for mapping pages
+  ret
+
+.map_p2_table:
+  ; map ecx-th p2 entry to 2MiB*ecx-th page
+  mov eax, 0x200000       ; 2MiB
+  mul ecx                 ; start at address of ecx-th page
+  or eax, 0b10000011      ; present, writable, huge
+  mov [p2_table + ecx * 8], eax ; map ecx-th entry
+
+  inc ecx                 ; increment counter
+  cmp ecx, 512            ; if ecx == 512 entire p2 table is mapped (8*512=4096)
+  jne .map_p2_table       ; else if ecx != 512 map next entry
+
+  ret                     ; now first gb (512*2MiB) of kernel is identity mapped
+
 enable_paging:
   mov eax, p4_table       ; move p4 table to A regsiter
   mov cr3, eax            ; load p4 table to cr3 register (cpu uses this to access p4 table)
@@ -101,31 +126,6 @@ enable_paging:
   mov cr0, eax            ; move paging enabled cr0 in A regsiter back into cr0 register
 
   ret
-
-set_up_page_tables:
-  mov eax, p3_table       ; move p3 table to A register
-  or eax, 0b11            ; present, writable
-  mov [p4_table], eax     ; map p4 table to p3 table
-
-  mov eax, p2_table       ; move p2 table to A register
-  or eax, 0b11            ; present, writable
-  mov [p3_table], eax     ; map p3 table to p2 table
-
-  ret
-  mov ecx, 0              ; counter var for mapping pages
-
-.map_p2_table:
-  ; map ecx-th p2 entry to 2MiB*ecx-th page
-  mov eax, 0x200000       ; 2MiB
-  mul ecx                 ; start at address of ecx-th page
-  or eax, 0x10000011      ; present, writable, huge
-  mov [p2_table + ecx * 8], eax ; map ecx-th entry
-
-  inc ecx                 ; increment counter
-  cmp ecx, 512            ; if ecx == 512 entire p2 table is mapped (8*512=4096)
-  jne .map_p2_table       ; else if ecx != 512 map next entry
-
-  ret                     ; now first gb (512*2MiB) of kernel is identity mapped
 
 error:
   mov dword [0xb8000], 0x4f524f45
